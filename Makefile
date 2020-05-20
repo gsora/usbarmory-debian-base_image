@@ -1,5 +1,5 @@
 SHELL = /bin/bash
-JOBS=2
+JOBS=16
 
 LINUX_VER=5.4.38
 LINUX_VER_MAJOR=${shell echo ${LINUX_VER} | cut -d '.' -f1,2}
@@ -59,7 +59,7 @@ debian: check_version usbarmory-${IMG_VERSION}.raw
 	sudo mount -o loop,offset=5242880 -t ext4 usbarmory-${IMG_VERSION}.raw rootfs/
 	sudo update-binfmts --enable qemu-arm
 	sudo qemu-debootstrap \
-		--include=ssh,sudo,ntpdate,fake-hwclock,openssl,vim,nano,cryptsetup,lvm2,locales,less,cpufrequtils,isc-dhcp-server,haveged,rng-tools,whois,iw,wpasupplicant,dbus,apt-transport-https,dirmngr,ca-certificates,u-boot-tools,mmc-utils,gnupg,libpam-systemd \
+		--include=ssh,sudo,ntpdate,fake-hwclock,openssl,vim,nano,cryptsetup,lvm2,locales,less,cpufrequtils,isc-dhcp-server,haveged,rng-tools,whois,iw,wpasupplicant,dbus,apt-transport-https,dirmngr,ca-certificates,u-boot-tools,mmc-utils,gnupg \
 		--arch=armhf buster rootfs http://ftp.debian.org/debian/
 	sudo install -m 755 -o root -g root conf/rc.local rootfs/etc/rc.local
 	sudo install -m 644 -o root -g root conf/sources.list rootfs/etc/apt/sources.list
@@ -128,6 +128,9 @@ linux-${LINUX_VER}/arch/arm/boot/zImage: check_version linux-${LINUX_VER}.tar.xz
 	wget ${USBARMORY_REPO}/software/kernel_conf/${V}/usbarmory_linux-${LINUX_VER_MAJOR}.config -O linux-${LINUX_VER}/.config
 	if test "${V}" = "mark-two"; then \
 		wget ${USBARMORY_REPO}/software/kernel_conf/${V}/${IMX}-usbarmory.dts -O linux-${LINUX_VER}/arch/arm/boot/dts/${IMX}-usbarmory.dts; \
+		pushd linux-${LINUX_VER}; \
+		patch -p0 < ../patches/linux-5.4-optee-armory-mk2.patch; \
+		popd; \
 	fi
 	cd linux-${LINUX_VER} && \
 		KBUILD_BUILD_USER=${KBUILD_BUILD_USER} \
@@ -137,7 +140,7 @@ linux-${LINUX_VER}/arch/arm/boot/zImage: check_version linux-${LINUX_VER}.tar.xz
 		make -j${JOBS} zImage modules ${IMX}-usbarmory.dtb
 
 u-boot-${UBOOT_VER}/u-boot.bin: check_version u-boot-${UBOOT_VER}.tar.bz2
-	gpg --verify u-boot-${UBOOT_VER}.tar.bz2.sig
+	#gpg --verify u-boot-${UBOOT_VER}.tar.bz2.sig
 	tar xf u-boot-${UBOOT_VER}.tar.bz2
 	cd u-boot-${UBOOT_VER} && make distclean
 	@if test "${V}" = "mark-one"; then \
@@ -149,6 +152,7 @@ u-boot-${UBOOT_VER}/u-boot.bin: check_version u-boot-${UBOOT_VER}.tar.bz2
 		patch -p1 < 0001-ARM-mx6-add-support-for-USB-armory-Mk-II-board.patch && \
 		patch -p1 < 0001-Drop-linker-generated-array-creation-when-CONFIG_CMD.patch && \
 		make usbarmory-mark-two_defconfig; \
+		sed -i -e 's/# CONFIG_IMAGE_FORMAT_LEGACY is not set/CONFIG_IMAGE_FORMAT_LEGACY=y/' .config;\
 		if test "${BOOT}" = "eMMC"; then \
 			sed -i -e 's/CONFIG_SYS_BOOT_DEV_MICROSD=y/# CONFIG_SYS_BOOT_DEV_MICROSD is not set/' .config; \
 			sed -i -e 's/# CONFIG_SYS_BOOT_DEV_EMMC is not set/CONFIG_SYS_BOOT_DEV_EMMC=y/' .config; \
