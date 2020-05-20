@@ -1,0 +1,93 @@
+--- .config	2020-05-20 16:06:42.467304142 +0200
++++ new_config	2020-05-20 16:08:16.965124945 +0200
+@@ -1,14 +1,15 @@
+ #
+ # Automatically generated file; DO NOT EDIT.
+-# Linux/arm 5.4.26 Kernel Configuration
++# Linux/arm 5.4.38 Kernel Configuration
+ #
+ 
+ #
+-# Compiler: arm-none-eabi-gcc (Arch Repository) 9.2.0
++# Compiler: arm-linux-gnueabihf-gcc (Ubuntu 9.2.1-9ubuntu2) 9.2.1 20191008
+ #
+ CONFIG_CC_IS_GCC=y
+-CONFIG_GCC_VERSION=90200
++CONFIG_GCC_VERSION=90201
+ CONFIG_CLANG_VERSION=0
++CONFIG_CC_CAN_LINK=y
+ CONFIG_CC_HAS_ASM_GOTO=y
+ CONFIG_CC_HAS_ASM_INLINE=y
+ CONFIG_CC_HAS_WARN_MAYBE_UNINITIALIZED=y
+@@ -402,7 +403,7 @@
+ #
+ # Bus support
+ #
+-# CONFIG_ARM_ERRATA_814220 is not set
++CONFIG_ARM_ERRATA_814220=y
+ # end of Bus support
+ 
+ #
+@@ -455,7 +456,7 @@
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ # CONFIG_ARM_APPENDED_DTB is not set
+-CONFIG_CMDLINE="noinitrd console=ttymxc1,115200 root=/dev/mmcblk0p1 rw rootfstype=ext4 ip=off"
++CONFIG_CMDLINE="console=ttymxc1,115200 root=/dev/mmcblk1p1 rootwait rw mem=512M@0x8000000"
+ CONFIG_CMDLINE_FROM_BOOTLOADER=y
+ # CONFIG_CMDLINE_EXTEND is not set
+ # CONFIG_CMDLINE_FORCE is not set
+@@ -633,9 +634,8 @@
+ CONFIG_ARCH_HAS_GCOV_PROFILE_ALL=y
+ # end of GCOV-based kernel profiling
+ 
+-CONFIG_PLUGIN_HOSTCC="g++"
++CONFIG_PLUGIN_HOSTCC=""
+ CONFIG_HAVE_GCC_PLUGINS=y
+-# CONFIG_GCC_PLUGINS is not set
+ # end of General architecture-dependent options
+ 
+ CONFIG_RT_MUTEXES=y
+@@ -1242,6 +1242,8 @@
+ CONFIG_SOC_BUS=y
+ CONFIG_REGMAP=y
+ CONFIG_REGMAP_MMIO=y
++CONFIG_DMA_SHARED_BUFFER=y
++# CONFIG_DMA_FENCE_TRACE is not set
+ # end of Generic Driver Options
+ 
+ #
+@@ -1918,6 +1920,7 @@
+ CONFIG_HW_RANDOM=y
+ # CONFIG_HW_RANDOM_TIMERIOMEM is not set
+ CONFIG_HW_RANDOM_IMX_RNGC=y
++CONFIG_HW_RANDOM_OPTEE=y
+ # CONFIG_RAW_DRIVER is not set
+ # CONFIG_TCG_TPM is not set
+ # CONFIG_XILLYBUS is not set
+@@ -2941,6 +2944,8 @@
+ # DMABUF options
+ #
+ # CONFIG_SYNC_FILE is not set
++# CONFIG_UDMABUF is not set
++# CONFIG_DMABUF_SELFTESTS is not set
+ # end of DMABUF options
+ 
+ # CONFIG_AUXDISPLAY is not set
+@@ -3142,7 +3147,15 @@
+ 
+ # CONFIG_FPGA is not set
+ # CONFIG_FSI is not set
+-# CONFIG_TEE is not set
++CONFIG_TEE=y
++
++#
++# TEE drivers
++#
++CONFIG_OPTEE=y
++CONFIG_OPTEE_SHM_NUM_PRIV_PAGES=1
++# end of TEE drivers
++
+ CONFIG_PM_OPP=y
+ # CONFIG_SIOX is not set
+ # CONFIG_SLIMBUS is not set
