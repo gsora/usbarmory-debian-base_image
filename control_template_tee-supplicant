@@ -1,0 +1,5 @@
+Package: tee-supplicant
+Version: YYYY
+Maintainer: Gianguido Sorà <me@gsora.xyz>
+Architecture: armhf
+Description: OP-TEE Normal World supplicant software

@@ -1,5 +1,7 @@
 SHELL = /bin/bash
 JOBS=16
+BASE_DIR=${shell pwd}
+CROSS_COMPILE=arm-linux-gnueabihf-
 
 LINUX_VER=5.4.38
 LINUX_VER_MAJOR=${shell echo ${LINUX_VER} | cut -d '.' -f1,2}
@@ -17,6 +19,21 @@ MXS_DCP_REPO=https://github.com/f-secure-foundry/mxs-dcp
 CAAM_KEYBLOB_REPO=https://github.com/f-secure-foundry/caam-keyblob
 IMG_VERSION=${V}-debian_buster-base_image-$(shell /bin/date -u "+%Y%m%d")
 LOSETUP_DEV=$(shell /sbin/losetup -f)
+
+OPTEE_OS_REPO=https://github.com/OP-TEE/optee_os
+OPTEE_CLIENT_REPO=https://github.com/OP-TEE/optee_client
+OPTEE_TEST_REPO=https://github.com/OP-TEE/optee_test
+
+OPTEE_OS_COMMIT=7fdadfdb9678d1217c6c161116dec8342642fb0b
+UTEE_NS_LOAD_ADDR=0x80800000
+UTEE_DT_ADDR=0x82000000
+UTEE_UART_ADDR=0x021E8000
+OPTEE_OS_LOAD_ADDR=0x9DFFFFE4
+OPTEE_OS_ENTRY_POINT=0x9E000000
+
+OPTEE_CLIENT_COMMIT=e9e55969d76ddefcb5b398e592353e5c7f5df198
+
+OPTEE_TEST_COMMIT=f461e1d47fcc82eaa67508a3d796c11b7d26656e
 
 .DEFAULT_GOAL := all
 
@@ -76,7 +93,10 @@ debian: check_version usbarmory-${IMG_VERSION}.raw
 		sudo chroot rootfs systemctl mask rng-tools.service; \
 	fi
 	@if test "${V}" = "mark-two"; then \
+		sudo install -m 644 -o root -g root conf/tee-supplicant.service rootfs/etc/systemd/system/tee-supplicant.service; \
 		sudo chroot rootfs systemctl mask haveged.service; \
+		sudo chroot rootfs systemctl daemon-reload; \
+		sudo chroot rootfs systemctl enable tee-supplicant.service; \
 	fi
 	sudo wget https://keys.inversepath.com/gpg-andrej.asc -O rootfs/tmp/gpg-andrej.asc
 	sudo wget https://keys.inversepath.com/gpg-andrea.asc -O rootfs/tmp/gpg-andrea.asc
@@ -97,9 +117,19 @@ debian: check_version usbarmory-${IMG_VERSION}.raw
 	sudo chroot rootfs /usr/bin/dpkg -i /tmp/linux-image-${LINUX_VER_MAJOR}-usbarmory-${V}_${LINUX_VER}${LOCALVERSION}_armhf.deb
 	sudo rm rootfs/tmp/linux-image-${LINUX_VER_MAJOR}-usbarmory-${V}_${LINUX_VER}${LOCALVERSION}_armhf.deb
 	@if test "${V}" = "mark-two"; then \
+		set +x ;\
 		sudo cp armoryctl_${ARMORYCTL_VER}_armhf.deb rootfs/tmp/; \
 		sudo chroot rootfs /usr/bin/dpkg -i /tmp/armoryctl_${ARMORYCTL_VER}_armhf.deb; \
 		sudo rm rootfs/tmp/armoryctl_${ARMORYCTL_VER}_armhf.deb; \
+		sudo cp optee_${OPTEE_OS_COMMIT}_armhf.deb rootfs/tmp/; \
+		sudo chroot rootfs /usr/bin/dpkg -i /tmp/optee_${OPTEE_OS_COMMIT}_armhf.deb; \
+		sudo cp optee-test_${OPTEE_TEST_COMMIT}_armhf.deb rootfs/tmp/; \
+		sudo chroot rootfs /usr/bin/dpkg -i /tmp/optee-test_${OPTEE_TEST_COMMIT}_armhf.deb; \
+		sudo cp tee-supplicant_${OPTEE_CLIENT_COMMIT}_armhf.deb rootfs/tmp/; \
+		sudo chroot rootfs /usr/bin/dpkg -i /tmp/tee-supplicant_${OPTEE_CLIENT_COMMIT}_armhf.deb; \
+		sudo rm rootfs/tmp/tee-supplicant_${OPTEE_CLIENT_COMMIT}_armhf.deb; \
+		sudo rm rootfs/tmp/optee-test_${OPTEE_TEST_COMMIT}_armhf.deb; \
+		sudo rm rootfs/tmp/optee_${OPTEE_OS_COMMIT}_armhf.deb; \
 		if test "${BOOT}" = "uSD"; then \
 			echo "/dev/mmcblk0 0x100000 0x2000 0x2000" | sudo tee rootfs/etc/fw_env.config; \
 		else \
@@ -136,7 +166,7 @@ linux-${LINUX_VER}/arch/arm/boot/zImage: check_version linux-${LINUX_VER}.tar.xz
 		KBUILD_BUILD_USER=${KBUILD_BUILD_USER} \
 		KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST} \
 		LOCALVERSION=${LOCALVERSION} \
-		ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- \
+		ARCH=arm CROSS_COMPILE=${CROSS_COMPILE} \
 		make -j${JOBS} zImage modules ${IMX}-usbarmory.dtb
 
 u-boot-${UBOOT_VER}/u-boot.bin: check_version u-boot-${UBOOT_VER}.tar.bz2
@@ -151,6 +181,7 @@ u-boot-${UBOOT_VER}/u-boot.bin: check_version u-boot-${UBOOT_VER}.tar.bz2
 		wget ${USBARMORY_REPO}/software/u-boot/0001-Drop-linker-generated-array-creation-when-CONFIG_CMD.patch && \
 		patch -p1 < 0001-ARM-mx6-add-support-for-USB-armory-Mk-II-board.patch && \
 		patch -p1 < 0001-Drop-linker-generated-array-creation-when-CONFIG_CMD.patch && \
+		patch -p0 < ../patches/boot-utee-usbarmory-mk2.patch; \
 		make usbarmory-mark-two_defconfig; \
 		sed -i -e 's/# CONFIG_IMAGE_FORMAT_LEGACY is not set/CONFIG_IMAGE_FORMAT_LEGACY=y/' .config;\
 		if test "${BOOT}" = "eMMC"; then \
@@ -158,7 +189,7 @@ u-boot-${UBOOT_VER}/u-boot.bin: check_version u-boot-${UBOOT_VER}.tar.bz2
 			sed -i -e 's/# CONFIG_SYS_BOOT_DEV_EMMC is not set/CONFIG_SYS_BOOT_DEV_EMMC=y/' .config; \
 		fi \
 	fi
-	cd u-boot-${UBOOT_VER} && CROSS_COMPILE=arm-linux-gnueabihf- ARCH=arm make -j${JOBS}
+	cd u-boot-${UBOOT_VER} && CROSS_COMPILE=${CROSS_COMPILE} ARCH=arm make -j${JOBS}
 
 mxc-scc2-master.zip: check_version
 	@if test "${IMX}" = "imx53"; then \
@@ -188,17 +219,17 @@ linux: linux-${LINUX_VER}/arch/arm/boot/zImage
 
 mxc-scc2: mxc-scc2-master.zip linux
 	@if test "${IMX}" = "imx53"; then \
-		cd mxc-scc2-master && make KBUILD_BUILD_USER=${KBUILD_BUILD_USER} KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST} ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KERNEL_SRC=../linux-${LINUX_VER} -j${JOBS} all; \
+		cd mxc-scc2-master && make KBUILD_BUILD_USER=${KBUILD_BUILD_USER} KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST} ARCH=arm CROSS_COMPILE=${CROSS_COMPILE} KERNEL_SRC=../linux-${LINUX_VER} -j${JOBS} all; \
 	fi
 
 mxs-dcp: mxs-dcp-master.zip linux
 	@if test "${IMX}" = "imx6ulz"; then \
-		cd mxs-dcp-master && make KBUILD_BUILD_USER=${KBUILD_BUILD_USER} KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST} ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KERNEL_SRC=../linux-${LINUX_VER} -j${JOBS} all; \
+		cd mxs-dcp-master && make KBUILD_BUILD_USER=${KBUILD_BUILD_USER} KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST} ARCH=arm CROSS_COMPILE=${CROSS_COMPILE} KERNEL_SRC=../linux-${LINUX_VER} -j${JOBS} all; \
 	fi
 
 caam-keyblob: caam-keyblob-master.zip linux
 	@if test "${IMX}" = "imx6ul"; then \
-		cd caam-keyblob-master && make KBUILD_BUILD_USER=${KBUILD_BUILD_USER} KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST} ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KERNEL_SRC=../linux-${LINUX_VER} -j${JOBS} all; \
+		cd caam-keyblob-master && make KBUILD_BUILD_USER=${KBUILD_BUILD_USER} KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST} ARCH=arm CROSS_COMPILE=${CROSS_COMPILE} KERNEL_SRC=../linux-${LINUX_VER} -j${JOBS} all; \
 	fi
 
 armoryctl: armoryctl-${ARMORYCTL_VER}.zip
@@ -214,7 +245,7 @@ extra-dtb: check_version linux
 		wget ${USBARMORY_REPO}/software/kernel_conf/${V}/${IMX}-usbarmory-spi.dts -O linux-${LINUX_VER}/arch/arm/boot/dts/${IMX}-usbarmory-spi.dts; \
 		wget ${USBARMORY_REPO}/software/kernel_conf/${V}/${IMX}-usbarmory-i2c.dts -O linux-${LINUX_VER}/arch/arm/boot/dts/${IMX}-usbarmory-i2c.dts; \
 		wget ${USBARMORY_REPO}/software/kernel_conf/${V}/${IMX}-usbarmory-scc2.dts -O linux-${LINUX_VER}/arch/arm/boot/dts/${IMX}-usbarmory-scc2.dts; \
-		cd linux-${LINUX_VER} && KBUILD_BUILD_USER=${KBUILD_BUILD_USER} KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST} LOCALVERSION=${LOCALVERSION} ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- make -j${JOBS} ${IMX}-usbarmory-host.dtb ${IMX}-usbarmory-gpio.dtb ${IMX}-usbarmory-spi.dtb ${IMX}-usbarmory-i2c.dtb ${IMX}-usbarmory-scc2.dtb; \
+		cd linux-${LINUX_VER} && KBUILD_BUILD_USER=${KBUILD_BUILD_USER} KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST} LOCALVERSION=${LOCALVERSION} ARCH=arm CROSS_COMPILE=${CROSS_COMPILE} make -j${JOBS} ${IMX}-usbarmory-host.dtb ${IMX}-usbarmory-gpio.dtb ${IMX}-usbarmory-spi.dtb ${IMX}-usbarmory-i2c.dtb ${IMX}-usbarmory-scc2.dtb; \
 	fi
 
 linux-deb: check_version linux extra-dtb mxc-scc2 mxs-dcp caam-keyblob
@@ -276,8 +307,57 @@ compress:
 	xz -k usbarmory-${IMG_VERSION}.raw
 	zip -j usbarmory-${IMG_VERSION}.raw.zip usbarmory-${IMG_VERSION}.raw
 
+uTee.optee: u-boot
+	git clone ${OPTEE_OS_REPO}; \
+	cd optee_os; \
+	git checkout ${OPTEE_OS_COMMIT}; \
+	make ARCH=arm CROSS_COMPILE=${CROSS_COMPILE} PLATFORM=imx-mx6ulzevk ARCH=arm CFG_PAGEABLE_ADDR=0 CFG_NS_ENTRY_ADDR=${UTEE_NS_LOAD_ADDR} CFG_DT_ADDR=${UTEE_DT_ADDR} CFG_DT=y DEBUG=y CFG_TEE_CORE_LOG_LEVEL=4 CFG_UART_BASE=${UTEE_UART_ADDR} -j${JOBS}; \
+	cd ..; \
+	u-boot-${UBOOT_VER}/tools/mkimage -A arm -T kernel -O linux -C none -a ${OPTEE_OS_LOAD_ADDR} -e ${OPTEE_OS_ENTRY_POINT} -d optee_os/out/arm-plat-imx/core/tee.bin uTee.optee
+	mkdir -p optee_${OPTEE_OS_COMMIT}_armhf/{DEBIAN,boot}
+	cat control_template_optee | \
+		sed -e 's/YYYY/1.0-${OPTEE_OS_COMMIT}/' \
+		> optee_${OPTEE_OS_COMMIT}_armhf/DEBIAN/control
+	cp -r uTee.optee optee_${OPTEE_OS_COMMIT}_armhf/boot
+	chmod 755 optee_${OPTEE_OS_COMMIT}_armhf/DEBIAN
+	fakeroot dpkg-deb -b optee_${OPTEE_OS_COMMIT}_armhf optee_${OPTEE_OS_COMMIT}_armhf.deb
+
+optee_client: uTee.optee
+	git clone ${OPTEE_CLIENT_REPO}; \
+	cd optee_client; \
+	git checkout ${OPTEE_CLIENT_COMMIT}; \
+	make ARCH=arm CROSS_COMPILE=${CROSS_COMPILE}; \
+	cd ..; \
+	mkdir -p tee-supplicant_${OPTEE_CLIENT_COMMIT}_armhf/{DEBIAN,sbin,lib}
+	cat control_template_tee-supplicant | \
+		sed -e 's/YYYY/1.0-${OPTEE_CLIENT_COMMIT}/' \
+		> tee-supplicant_${OPTEE_CLIENT_COMMIT}_armhf/DEBIAN/control
+	cp -r optee_client/out/tee-supplicant/tee-supplicant tee-supplicant_${OPTEE_CLIENT_COMMIT}_armhf/sbin
+	cp -r optee_client/out/libteec/libteec* tee-supplicant_${OPTEE_CLIENT_COMMIT}_armhf/lib
+	chmod 755 tee-supplicant_${OPTEE_CLIENT_COMMIT}_armhf/DEBIAN
+	fakeroot dpkg-deb -b tee-supplicant_${OPTEE_CLIENT_COMMIT}_armhf tee-supplicant_${OPTEE_CLIENT_COMMIT}_armhf.deb
+
+optee_test: optee_client
+	git clone ${OPTEE_TEST_REPO}; \
+	cd optee_test; \
+	git checkout ${OPTEE_TEST_COMMIT}; \
+	make ARCH=arm CROSS_COMPILE=${CROSS_COMPILE} \
+		TA_DEV_KIT_DIR=${BASE_DIR}/optee_os/out/arm-plat-imx/export-ta_arm32 \
+		OPTEE_CLIENT_EXPORT=${BASE_DIR}/optee_client/out/export/usr; \
+	cd ..; \
+	mkdir -p optee-test_${OPTEE_TEST_COMMIT}_armhf/{DEBIAN,sbin,lib/optee_armtz}
+	cat control_template_optee-test | \
+		sed -e 's/YYYY/1.0-${OPTEE_TEST_COMMIT}/' \
+		> optee-test_${OPTEE_TEST_COMMIT}_armhf/DEBIAN/control
+	cp -r optee_test/out/ta/*/*.ta optee-test_${OPTEE_TEST_COMMIT}_armhf/lib/optee_armtz
+	cp -r optee_test/out/xtest/xtest optee-test_${OPTEE_TEST_COMMIT}_armhf/sbin
+	chmod 755 optee-test_${OPTEE_TEST_COMMIT}_armhf/DEBIAN
+	fakeroot dpkg-deb -b optee-test_${OPTEE_TEST_COMMIT}_armhf optee-test_${OPTEE_TEST_COMMIT}_armhf.deb
+
+optee: uTee.optee optee_client optee_test
+
 ifeq ($(V),mark-two)
-all: check_version armoryctl-deb linux-deb debian u-boot finalize
+all: check_version armoryctl-deb linux-deb optee debian u-boot finalize
 else
 all: check_version linux-deb debian u-boot finalize
 endif
@@ -287,6 +367,9 @@ clean: check_version
 	-rm -fr u-boot-${UBOOT_VER}*
 	-rm -fr linux-image-${LINUX_VER_MAJOR}-usbarmory-${V}_${LINUX_VER}${LOCALVERSION}_armhf*
 	-rm -fr armoryctl*
+	-rm -fr optee*
+	-rm -fr tee-supplicant*
+	-rm -fr uTee.optee
 	-rm -fr mxc-scc2-master* mxs-dcp-master* caam-keyblob-master*
 	-rm -f usbarmory-${V}-debian_buster-base_image-*.raw
 	-sudo umount -f rootfs

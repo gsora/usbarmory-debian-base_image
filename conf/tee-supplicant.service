@@ -1,0 +1,11 @@
+[Unit]
+Description=OP-TEE TrustZone service supplicant
+After=syslog.target network.target
+
+[Service]
+Type=simple
+ExecStart=/sbin/tee-supplicant
+ExecStop=/usr/bin/pkill tee-supplicant
+
+[Install]
+WantedBy=multi-user.target
