@@ -51,6 +51,13 @@ make all V=mark-two IMX=imx6ulz BOOT=eMMC
 make all V=mark-one IMX=imx53
 ```
 
+To build a DCP-aware version of OP-TEE, the following variables must be passed to `make`:
+
+```
+OPTEE_OS_REPO=https://github.com/gsora/optee_os
+OPTEE_OS_COMMIT=38c236c1c7fa64bafdf2e0c979f8c33e4cad4071
+```
+
 The following output files are produced:
 
 ```

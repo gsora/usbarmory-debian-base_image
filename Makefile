@@ -311,7 +311,7 @@ uTee.optee: u-boot
 	git clone ${OPTEE_OS_REPO}; \
 	cd optee_os; \
 	git checkout ${OPTEE_OS_COMMIT}; \
-	make ARCH=arm CROSS_COMPILE=${CROSS_COMPILE} PLATFORM=imx-mx6ulzevk ARCH=arm CFG_PAGEABLE_ADDR=0 CFG_NS_ENTRY_ADDR=${UTEE_NS_LOAD_ADDR} CFG_DT_ADDR=${UTEE_DT_ADDR} CFG_DT=y DEBUG=y CFG_TEE_CORE_LOG_LEVEL=4 CFG_TZC380=y CFG_UART_BASE=${UTEE_UART_ADDR} -j${JOBS}; \
+	make ARCH=arm CROSS_COMPILE=${CROSS_COMPILE} PLATFORM=imx-mx6ulzevk ARCH=arm CFG_PAGEABLE_ADDR=0 CFG_NS_ENTRY_ADDR=${UTEE_NS_LOAD_ADDR} CFG_DT_ADDR=${UTEE_DT_ADDR} CFG_DT=y DEBUG=y CFG_TEE_CORE_LOG_LEVEL=4 CFG_TZC380=y CFG_IMX_DCP=y CFG_UART_BASE=${UTEE_UART_ADDR} -j${JOBS}; \
 	cd ..; \
 	u-boot-${UBOOT_VER}/tools/mkimage -A arm -T kernel -O linux -C none -a ${OPTEE_OS_LOAD_ADDR} -e ${OPTEE_OS_ENTRY_POINT} -d optee_os/out/arm-plat-imx/core/tee.bin uTee.optee
 	mkdir -p optee_${OPTEE_OS_COMMIT}_armhf/{DEBIAN,boot}
