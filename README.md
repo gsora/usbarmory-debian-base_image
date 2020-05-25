@@ -55,7 +55,7 @@ To build a DCP-aware version of OP-TEE, the following variables must be passed t
 
 ```
 OPTEE_OS_REPO=https://github.com/gsora/optee_os
-OPTEE_OS_COMMIT=38c236c1c7fa64bafdf2e0c979f8c33e4cad4071
+OPTEE_OS_COMMIT=adb8ec9e4b668bf3393932c81ad73397d950c961
 ```
 
 The following output files are produced:
